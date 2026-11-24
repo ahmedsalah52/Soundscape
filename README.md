@@ -3,10 +3,19 @@
 A local, lightweight panel for finding **when and where an area is loud**, built for
 passive acoustic recordings such as Song Meter recordings.
 
+**Double-click to start.** You need Python 3.9 or newer. The first run creates `.venv` and installs dependencies.
+- **macOS:** double-click `run.command`. The first time only, macOS may say it "cannot be opened
+  because it is from an unidentified developer". If so, right-click `run.command` → **Open** → **Open**.
+  After that, double-clicking works. (Or run `xattr -d com.apple.quarantine run.command` once.)
+- **Windows:** double-click `run.bat`. The native "Open folder…" dialog and drag-and-drop folder
+  lookup work only on macOS. On Windows, paste the folder path instead.
+- **Linux / terminal:** run the commands below.
+
 ```bash
 ./run.sh                         # first run creates .venv and installs dependencies
 ./run.sh /path/to/folder         # tip: type "./run.sh " then drag the folder onto Terminal
 ```
+If you get "permission denied", run `chmod +x run.sh run.command` once.
 
 The panel opens at http://127.0.0.1:8765. You can load a folder in four ways:
 - **Open folder…**, which opens the native macOS dialog
@@ -102,7 +111,7 @@ folder is the one place.
 
 ## Layout
 ```
-run.sh            install + start
+run.sh            install + start (run.command = macOS double-click, run.bat = Windows)
 app/analysis.py   DSP: 125 ms frame energies (Z, A-weighted IIR, 1–2 kHz / 2–11 kHz via FFT)
 app/aggregate.py  energy-correct binning, percentiles, NDSI, summary, heatmap, events, place comparison
 app/catalog.py    folder scan; place = first sub-folder; start time from filename (YYYYMMDD_HHMMSS), GUANO, or mtime
