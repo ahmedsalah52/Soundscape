@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Soundscape Loudness</title>
+<link rel="stylesheet" href="vendor/uPlot.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <h1>Soundscape Loudness</h1>
+    <span id="folderLabel" class="muted">No folder loaded</span>
+  </div>
+  <div class="folder-ctl">
+    <button id="pickBtn" class="btn primary">Open folder…</button>
+    <input id="pathInput" type="text" placeholder="…or paste a folder path" spellcheck="false">
+    <button id="loadBtn" class="btn">Load</button>
+    <button id="themeBtn" class="btn ghost" title="Theme">◐</button>
+  </div>
+  <div id="progress" class="progress hidden">
+    <div class="bar"><div id="progressFill"></div></div>
+    <span id="progressText" class="muted"></span>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button data-tab="timeline" class="tab">Timeline</button>
+  <button data-tab="summary" class="tab">Summary</button>
+  <span class="ctl hidden" id="placeCtl"><label for="placeSelect" title="Each sub-folder of the loaded folder is a place">Place</label>
+    <select id="placeSelect"></select></span>
+  <div class="spacer"></div>
+  <span class="ctl pop-anchor">
+    <button id="bandsBtn" class="btn small" title="Frequency band limits for anthrophony / biophony / NDSI">Bands:&nbsp;<span id="bandsLabel"></span></button>
+    <div id="bandsPop" class="pop hidden">
+      <h4>Frequency bands</h4>
+      <p class="muted small">Used for the band levels, NDSI, heatmap and summary. Applying re-analyses
+        all files once (~25 s); every setting is cached, so switching back is instant.</p>
+      <div class="band-row"><label>Anthrophony<br><span class="muted small">human-made noise</span></label>
+        <input id="anLo" type="number" min="0" step="10" class="num"> – <input id="anHi" type="number" min="0" step="10" class="num"> Hz</div>
+      <div class="band-row"><label>Biophony<br><span class="muted small">birds, insects</span></label>
+        <input id="bioLo" type="number" min="0" step="10" class="num"> – <input id="bioHi" type="number" min="0" step="10" class="num"> Hz</div>
+      <div class="presets"><span class="muted small">Presets</span>
+        <button class="btn small" data-p="1000,2000,2000,11000" title="Kasten et al. NDSI convention">Standard NDSI</button>
+        <button class="btn small" data-p="50,1000,2000,11000" title="Road traffic and machinery are mostly below 1 kHz">Traffic / low-frequency</button>
+      </div>
+      <div class="pop-actions"><span id="bandsErr" class="small neg"></span>
+        <button id="bandsCancel" class="btn small">Cancel</button>
+        <button id="bandsApply" class="btn small primary">Apply</button></div>
+    </div>
+  </span>
+  <span class="ctl"><label>Weighting</label>
+    <span class="seg" id="weightingSeg">
+      <button data-v="A" title="A-weighted: human hearing, noise regulations">A</button>
+      <button data-v="Z" title="Z: unweighted, full spectrum">Z</button>
+    </span></span>
+  <span class="ctl"><label for="offsetInput" title="Add a calibration offset to convert dBFS to approximate dB SPL">Calib. offset</label>
+    <input id="offsetInput" type="number" step="0.5" value="0" class="num"> dB</span>
+  <span class="ctl"><label><input type="checkbox" id="thrOn"> Threshold</label>
+    <input id="thrInput" type="number" step="1" value="-45" class="num"></span>
+</nav>
+
+<main>
+  <section id="empty" class="empty hidden">
+    <div class="drop">
+      <h2>Load a folder of recordings</h2>
+      <p>Drop a folder anywhere on this page, click <b>Open folder…</b>, paste a path above,
+        or start with <code>./run.sh /path/to/folder</code>.</p>
+      <p class="muted">WAV · FLAC · MP3 · OGG · AIFF. Files are analysed in place; results are cached.</p>
+    </div>
+  </section>
+
+  <section id="timelineView" class="view">
+    <div class="controls">
+      <span class="ctl"><label>Scope</label>
+        <span class="seg" id="scopeSeg">
+          <button data-v="file">File</button><button data-v="day">Day</button><button data-v="all">All</button>
+        </span></span>
+      <span class="ctl" id="scopePick">
+        <button id="prevBtn" class="btn small" title="Previous">‹</button>
+        <select id="scopeSelect"></select>
+        <button id="nextBtn" class="btn small" title="Next">›</button>
+      </span>
+      <span class="ctl" id="specCtl"><label><input type="checkbox" id="specOn"> Spectrogram</label></span>
+      <span class="ctl hidden" id="compareCtl" title="One line per place on a shared clock-time axis"><label><input type="checkbox" id="compareOn"> Compare places</label></span>
+      <span class="ctl" id="overlayCtl"><label><input type="checkbox" id="overlayOn"> Overlay days</label></span>
+      <span class="ctl" id="metricCtl"><label>View</label>
+        <span class="seg" id="metricSeg">
+          <button data-v="simple" title="Leq (RMS level) per bin">Level</button>
+          <button data-v="band" title="Leq with L10–L90 range and L90 background">Leq + L10–L90</button>
+          <button data-v="bands" title="Anthrophony 1–2 kHz vs biophony 2–11 kHz + NDSI">Bands + NDSI</button>
+        </span></span>
+      <span class="ctl hidden" id="ovMetricCtl"><label>Metric</label>
+        <select id="ovMetric">
+          <option value="leq">Leq</option><option value="l90">L90 (background)</option>
+          <option value="l10">L10 (events)</option><option value="anthro">Anthrophony 1–2 kHz</option>
+          <option value="bio">Biophony 2–11 kHz</option><option value="ndsi">NDSI</option>
+        </select></span>
+      <span class="ctl"><label>Resolution</label>
+        <select id="resSelect">
+          <option value="auto">Auto</option><option value="0.125">125 ms</option><option value="1">1 s</option>
+          <option value="10">10 s</option><option value="60">1 min</option><option value="300">5 min</option>
+        </select>
+        <span id="resNote" class="muted small"></span></span>
+      <div class="spacer"></div>
+      <button id="resetZoom" class="btn small">Reset zoom</button>
+      <a id="exportSeries" class="btn small" href="#">Export CSV</a>
+    </div>
+    <div class="chart-card">
+      <div class="chart-head">
+        <h3 id="chartTitle">Loudness</h3>
+        <span class="muted small">Drag to zoom · double-click to reset · click to play from there</span>
+      </div>
+      <div id="mainPlot" class="plot"></div>
+      <div id="ndsiWrap" class="hidden">
+        <div class="chart-head sub"><h4>NDSI</h4>
+          <span class="muted small">(bio − anthro)/(bio + anthro) · below 0 = human-noise band dominates</span></div>
+        <div id="ndsiPlot" class="plot"></div>
+      </div>
+      <div id="specWrap" class="hidden">
+        <div class="chart-head sub"><h4>Spectrogram</h4>
+          <span class="seg" id="fscaleSeg"><button data-v="log">Log</button><button data-v="lin">Linear</button></span>
+          <span id="specNote" class="muted small"></span></div>
+        <div id="specPlot" class="plot"></div>
+      </div>
+      <div id="plotMsg" class="muted small msg"></div>
+    </div>
+    <div class="chart-card" id="eventsCard">
+      <div class="chart-head"><h3>Loudest moments</h3>
+        <span class="muted small">Top 1-second Leq peaks in this scope · click to play</span></div>
+      <ol id="eventsList" class="events"></ol>
+    </div>
+  </section>
+
+  <section id="summaryView" class="view hidden">
+    <div class="controls">
+      <span class="ctl"><label>Group by</label>
+        <span class="seg" id="groupSeg">
+          <button data-v="place" id="groupPlaceBtn">Place</button><button data-v="day">Day</button><button data-v="file">File</button><button data-v="all">All</button>
+        </span></span>
+      <div class="spacer"></div>
+      <a id="exportSummary" class="btn small" href="#">Export CSV</a>
+    </div>
+    <div class="chart-card">
+      <div class="chart-head">
+        <h3>When is it loud?</h3>
+        <span class="ctl"><label>Metric</label>
+          <select id="hmMetric">
+            <option value="leq">Leq</option><option value="l90">L90 (background)</option>
+            <option value="l10">L10 (events)</option><option value="lmax">Lmax</option>
+            <option value="anthro">Anthrophony 1–2 kHz</option><option value="bio">Biophony 2–11 kHz</option>
+            <option value="ndsi">NDSI</option>
+          </select></span>
+        <span class="ctl"><label>Slot</label>
+          <select id="hmSlot"><option value="60">1 min</option><option value="300">5 min</option>
+            <option value="900">15 min</option><option value="1800">30 min</option></select></span>
+        <span class="ctl" id="hmRowsCtl"><label>Rows</label>
+          <span class="seg" id="hmRowsSeg"><button data-v="day" title="One row per place and day">Days</button><button data-v="place" title="One row per place: all its days pooled per time-of-day slot">Places (typical day)</button></span></span>
+        <span id="hmNote" class="muted small">Day × time of day · click a cell to play</span>
+      </div>
+      <div id="heatmap" class="heatmap"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-head"><h3 id="rangeTitle">Level per group</h3>
+        <span class="legend-inline"><i class="dot"></i>Leq <i class="rng"></i>L90–L10 range</span>
+        <span id="rangeLegend" class="legend-inline"></span>
+        <span class="muted small">Click to open in timeline</span></div>
+      <div id="rangeChart" class="rangechart"></div>
+    </div>
+    <div class="chart-card">
+      <div class="table-wrap"><table id="sumTable"></table></div>
+    </div>
+  </section>
+</main>
+
+<footer id="player" class="player">
+  <button id="playBtn" class="btn round" title="Play/pause (space)">▶</button>
+  <button id="backBtn" class="btn small" title="Back 10 s">−10s</button>
+  <button id="fwdBtn" class="btn small" title="Forward 10 s">+10s</button>
+  <div class="now"><b id="nowTime">—</b> <span id="nowFile" class="muted"></span></div>
+</footer>
+
+<div id="tooltip" class="tooltip hidden"></div>
+<div id="dropOverlay" class="drop-overlay hidden"><div>Drop folder to analyse</div></div>
+<div id="toast" class="toast hidden"></div>
+
+<script src="vendor/uPlot.iife.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "last_folder": "/Users/am/Documents/ANNA/nature_sounds/data",
+  "bands": {
+    "anthro": [
+      1000.0,
+      2000.0
+    ],
+    "bio": [
+      2000.0,
+      11000.0
+    ]
+  }
+}
